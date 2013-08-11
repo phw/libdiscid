@@ -130,8 +130,8 @@ static void read_disc_isrc(HANDLE hDevice, mb_disc_private *disc, int track)
 	}
 }
 
-char *mb_disc_get_default_device_unportable(void) {
-	int i;
+char *get_nth_device(int number) {
+	int i, counter = 0;
 	char device[MAX_DEV_LEN];
 	DWORD mask = GetLogicalDrives();
 	
@@ -140,13 +140,29 @@ char *mb_disc_get_default_device_unportable(void) {
 			snprintf(device, MAX_DEV_LEN, "%c:", i + 'A');
 			
 			if (GetDriveType(device) == DRIVE_CDROM) {
-				strncpy(default_device, device, MAX_DEV_LEN);
-				return default_device;
+				counter++;
+
+				if (counter == number)
+				{
+					strncpy(default_device, device, MAX_DEV_LEN);
+					return default_device;
+				}
 			}
 		}
 	}
 
-	return MB_DEFAULT_DEVICE;
+	return NULL;
+}
+
+char *mb_disc_get_default_device_unportable(void) {
+	char* device = get_nth_device(1);
+
+	if (device == NULL)
+	{
+		return MB_DEFAULT_DEVICE;
+	}
+
+	return device;
 }
 
 int mb_disc_has_feature_unportable(enum discid_feature feature) {
@@ -204,7 +220,20 @@ int mb_disc_read_unportable(mb_disc_private *disc, const char *device,
 			    unsigned int features) {
 	mb_disc_toc toc;
 	HANDLE hDevice;
-	int i;
+	int i, device_number;
+
+	device_number = (int) strtol(device, NULL, 10);
+
+	if (device_number > 0) {
+		device = get_nth_device(device_number);
+
+		if (device == NULL)
+		{
+			snprintf(disc->error_msg, MB_ERROR_MSG_LENGTH,
+				"couldn't open the CD audio device");
+			return 0;
+		}
+	}
 
 	if ( !mb_disc_winnt_read_toc(disc, &toc, device) )
 		return 0;
